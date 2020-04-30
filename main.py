@@ -6,6 +6,7 @@ from tkinter import filedialog
 from tkinter.ttk import Separator, Progressbar
 
 import ffmpeg
+import zipfile
 
 
 class MainFrame(Frame):
@@ -24,9 +25,10 @@ class MainFrame(Frame):
 
     def _create_widgets(self):
         MenuBar = Menu(self)
+
         FileMenu = Menu(MenuBar, tearoff=0)
-        FileMenu.add_command(label="Clear", command=self._clear)
-        FileMenu.add_command(label="Open", command=print)
+        FileMenu.add_command(label="New", command=self._clear)
+        FileMenu.add_command(label="Open", command=self._open_existing)
         MenuBar.add_cascade(label="File", menu=FileMenu)
         self.master.config(menu=MenuBar)
 
@@ -48,7 +50,7 @@ class MainFrame(Frame):
             frame.pack(fill=X, padx=10, pady=3)
 
             ##
-            self.entries.append(ent)
+            self.entries.append((item, ent))
 
         Separator(self.master, orient=HORIZONTAL).pack(side="top", fill="x", padx=10)
 
@@ -74,29 +76,36 @@ class MainFrame(Frame):
             opts = {'initialfile': "pack", 'filetypes': [("Zip archive", "*.zip")],
                     'title': 'Select a file to save...'}
             return filedialog.asksaveasfilename(**opts)
+        elif type == 'open_':
+            opts = {'filetypes': [("Zip archive", "*.zip")], 'title': 'Select a pack to open...'}
+
+            return filedialog.askopenfilename(**opts)
 
     def _generate(self):
-        self.tempfolder = tempfile.mkdtemp()
-        currentDirectory = os.getcwd()
+        try:
+            self.tempfolder = tempfile.mkdtemp()
+            currentDirectory = os.getcwd()
 
-        for entry in self.paths:
-            try:
+            for entry in self.paths:
+                try:
 
-                (
-                    ffmpeg
-                        .input(entry[1].get())
-                        .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
-                        .run(capture_stdout=True, capture_stderr=True)
-                )
+                    (
+                        ffmpeg
+                            .input(entry[1].get())
+                            .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
+                            .run(capture_stdout=True, capture_stderr=True)
+                    )
 
-                os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
-                self.bar['value'] += 100 / (len(self.paths) + 1)
-            except ffmpeg.Error as e:
-                print('stdout:', e.stdout.decode('utf8'))
-                print('stderr:', e.stderr.decode('utf8'))
-                raise e
+                    os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
+                    self.bar['value'] += 100 / (len(self.paths) + 1)
+                except ffmpeg.Error as e:
+                    print('stdout:', e.stdout.decode('utf8'))
+                    print('stderr:', e.stderr.decode('utf8'))
+                    raise e
 
-        self._create_archive()
+            self._create_archive()
+        finally:
+            shutil.rmtree(self.tempfolder)
 
     def _create_archive(self):
         shutil.make_archive(self._file_dialog('save', 0, 0), 'zip', self.tempfolder)
@@ -105,13 +114,26 @@ class MainFrame(Frame):
 
     def _clear(self):
         for entry in self.entries:
-            entry.delete(0, END)
+            entry[1].delete(0, END)
+
+    def _open_existing(self):
+        zippath = self._file_dialog('open_', 0,0)
+
+        with zipfile.ZipFile(zippath) as zippack:
+            self._clear()
+
+            importedtemp = tempfile.mkdtemp()
+
+            try:
+                zippack.extractall(path=importedtemp)
+
+                for entry in self.entries:
+                    if os.path.exists(os.path.join(importedtemp, entry[0][1])):
+                        entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
+            finally:
+                shutil.rmtree(importedtemp)
 
 
 if __name__ == '__main__':
-    try:
-        frame = MainFrame()
-        frame.mainloop()
-    finally:
-        if frame.tempfolder:
-            shutil.rmtree(frame.tempfolder)
+    frame = MainFrame()
+    frame.mainloop()
