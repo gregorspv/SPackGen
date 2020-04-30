@@ -3,7 +3,9 @@ import shutil
 import tempfile
 from tkinter import *
 from tkinter import filedialog
+from tkinter.simpledialog import askstring
 from tkinter.ttk import Separator, Progressbar
+from tkinter import messagebox
 
 import ffmpeg
 import zipfile
@@ -20,6 +22,7 @@ class MainFrame(Frame):
         self.paths = []
         self.entries = []
         self.master.minsize(750, 410)
+        self.switcherdir = ""
         ##
         self._create_widgets()
 
@@ -30,6 +33,14 @@ class MainFrame(Frame):
         FileMenu.add_command(label="New", command=self._clear)
         FileMenu.add_command(label="Open", command=self._open_existing)
         MenuBar.add_cascade(label="File", menu=FileMenu)
+
+        SwitcherMenu = Menu(MenuBar, tearoff=0)
+        SwitcherMenu.add_command(label="Configure", command=lambda: self._switcher("configure"))
+        SwitcherMenu.add_command(label="Switch", command=lambda: self._switcher("switch"))
+        SwitcherMenu.add_command(label="Backup (zip)", command=lambda: self._switcher("backup-z"))
+        SwitcherMenu.add_command(label="Backup (folder)", command=lambda: self._switcher("backup-f"))
+        MenuBar.add_cascade(label="Switcher", menu=SwitcherMenu)
+
         self.master.config(menu=MenuBar)
 
         Panel = Frame(self)
@@ -80,6 +91,10 @@ class MainFrame(Frame):
             opts = {'filetypes': [("Zip archive", "*.zip")], 'title': 'Select a pack to open...'}
 
             return filedialog.askopenfilename(**opts)
+        elif type == 'switcher':
+            opts = {'filetypes': [("Windows executable", "*.exe")], 'title': 'Select Switcher...'}
+
+            return filedialog.askopenfilename(**opts)
 
     def _generate(self):
         try:
@@ -116,24 +131,48 @@ class MainFrame(Frame):
         for entry in self.entries:
             entry[1].delete(0, END)
 
-    def _open_existing(self):
+    def _open_existing(self, shouldreturn):
         zippath = self._file_dialog('open_', 0,0)
 
-        with zipfile.ZipFile(zippath) as zippack:
-            self._clear()
+        if shouldreturn == True:
+            return zippath
+        else:
+            with zipfile.ZipFile(zippath) as zippack:
+                self._clear()
 
-            importedtemp = tempfile.mkdtemp()
+                importedtemp = tempfile.mkdtemp()
 
-            try:
-                zippack.extractall(path=importedtemp)
+                try:
+                    zippack.extractall(path=importedtemp)
 
-                for entry in self.entries:
-                    if os.path.exists(os.path.join(importedtemp, entry[0][1])):
-                        entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
-            finally:
-                shutil.rmtree(importedtemp)
+                    for entry in self.entries:
+                        if os.path.exists(os.path.join(importedtemp, entry[0][1])):
+                            entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
+                finally:
+                    shutil.rmtree(importedtemp)
+
+    def _switcher(self, param):
+        if (param != "configure" and self.switcherdir == ""):
+            messagebox.showwarning("Warning", "Switcher directory not set! \nSet now?")
+            self._switcher("configure")
+            messagebox.showwarning("Warning", "Continuing with previous operation: {0}".format(param))
+            self._switcher(param)
+        elif param == "configure":
+            self.switcherdir = self._file_dialog('switcher', 0,0)
+            messagebox.showwarning("Notice", "Set LR2 music directory then enter exit to configure subutility.")
+            os.system(self.switcherdir)
+        elif param == "switch":
+            desiredpack = askstring("Prompt", "Enter pack name (must be located in LR2 music folder): ")
+            os.system("{0} switch {1}".format(self.switcherdir, desiredpack))
+        elif param == "backup-z":
+            os.system("{0} backup zip".format(self.switcherdir))
+        elif param == "backup-f":
+            os.system("{0} backup folder".format(self.switcherdir))
 
 
 if __name__ == '__main__':
-    frame = MainFrame()
-    frame.mainloop()
+    try:
+        frame = MainFrame()
+        frame.mainloop()
+    except Exception as e:
+        messagebox.showerror("Error", e)
