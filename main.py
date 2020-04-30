@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import Separator, Progressbar
@@ -16,15 +17,23 @@ class MainFrame(Frame):
         self.isapp = isapp
         ##
         self.paths = []
-        self.master.minsize(750, 430)
+        self.entries = []
+        self.master.minsize(750, 410)
         ##
-        self._create_uploaders()
+        self._create_widgets()
 
-    def _create_uploaders(self):
+    def _create_widgets(self):
+        MenuBar = Menu(self)
+        FileMenu = Menu(MenuBar, tearoff=0)
+        FileMenu.add_command(label="Clear", command=self._clear)
+        FileMenu.add_command(label="Open", command=print)
+        MenuBar.add_cascade(label="File", menu=FileMenu)
+        self.master.config(menu=MenuBar)
+
         Panel = Frame(self)
         Panel.pack(side=TOP, fill=BOTH, expand=Y)
 
-        for item in (['menu', "menu.1"], ['Sandy Bay', "sandybay.2"], ['Sandy Bay BOSS', "sandybay.4"],
+        for item in (['Menu', "menu.1"], ['Sandy Bay', "sandybay.2"], ['Sandy Bay BOSS', "sandybay.4"],
                      ['Dino Island', "dino.2"], ['Dino Island BOSS', "dino.4"], ['Mars', "mars.2"],
                      ['Mars BOSS', "mars.4"], ['Arctic', "arctic.2"], ['Arctic BOSS', "arctic.4"],
                      ['Xalax', "xalax.2"], ['Xalax BOSS', "xalax.4"]):
@@ -38,40 +47,36 @@ class MainFrame(Frame):
             btn.pack(side=LEFT, padx=5)
             frame.pack(fill=X, padx=10, pady=3)
 
+            ##
+            self.entries.append(ent)
+
         Separator(self.master, orient=HORIZONTAL).pack(side="top", fill="x", padx=10)
 
         buttonGenerate = Button(text="Generate", command=self._generate)
         buttonGenerate.pack(side=LEFT)
 
         self.bar = Progressbar(orient="horizontal", length=500)
-        self.bar.pack(side=LEFT, fill="x")
+        self.bar.pack(side=BOTTOM, fill="x", padx=10, pady=5)
 
     def _file_dialog(self, type, ent, item):
         # triggered when the user clicks a 'Browse' button
-        fn = None
-        opts = {'initialfile': ent.get(),
-                'filetypes': []}
-
         if type == 'open':
-            opts['title'] = 'Select a file to open...'
-            fn = filedialog.askopenfilename(**opts)
-        else:
-            # this should only return a filename; however,
-            # under windows, selecting a file and hitting
-            # 'Save' gives a warning about replacing an
-            # existing file; although selecting 'Yes' does
-            # not actually cause a 'Save'; the filename
-            # is simply returned
-            opts['title'] = 'Select a file to save...'
-            fn = filedialog.asksaveasfilename(**opts)
+            fn = None
+            opts = {'initialfile': ent.get(), 'filetypes': [], 'title': 'Select a file to open...'}
 
-        if fn:
-            ent.delete(0, END)
-            ent.insert(END, fn)
-            self.paths.append((item, ent))
+            fn = filedialog.askopenfilename(**opts)
+
+            if fn:
+                ent.delete(0, END)
+                ent.insert(END, fn)
+                self.paths.append((item, ent))
+        elif type == 'save':
+            opts = {'initialfile': "pack", 'filetypes': [("Zip archive", "*.zip")],
+                    'title': 'Select a file to save...'}
+            return filedialog.asksaveasfilename(**opts)
 
     def _generate(self):
-        os.mkdir("temp")
+        self.tempfolder = tempfile.mkdtemp()
         currentDirectory = os.getcwd()
 
         for entry in self.paths:
@@ -80,11 +85,11 @@ class MainFrame(Frame):
                 (
                     ffmpeg
                         .input(entry[1].get())
-                        .output(os.path.join(currentDirectory, "temp", "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
+                        .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
                         .run(capture_stdout=True, capture_stderr=True)
                 )
 
-                os.rename(os.path.join(currentDirectory, "temp", "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, "temp", "{0}".format(entry[0][1])))
+                os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
                 self.bar['value'] += 100 / (len(self.paths) + 1)
             except ffmpeg.Error as e:
                 print('stdout:', e.stdout.decode('utf8'))
@@ -94,11 +99,19 @@ class MainFrame(Frame):
         self._create_archive()
 
     def _create_archive(self):
-        shutil.make_archive("pack", 'zip', "temp")
-        shutil.rmtree("temp")
+        shutil.make_archive(self._file_dialog('save', 0, 0), 'zip', self.tempfolder)
+        shutil.rmtree(self.tempfolder)
         self.bar['value'] += 100 / (len(self.paths) + 1)
+
+    def _clear(self):
+        for entry in self.entries:
+            entry.delete(0, END)
 
 
 if __name__ == '__main__':
-    frame = MainFrame()
-    frame.mainloop()
+    try:
+        frame = MainFrame()
+        frame.mainloop()
+    finally:
+        if frame.tempfolder:
+            shutil.rmtree(frame.tempfolder)
