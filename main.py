@@ -66,8 +66,6 @@ class MainFrame(Frame):
             ##
             self.entries.append((item, ent))
 
-            print(item, ent, btn)
-
         Separator(self.master, orient=HORIZONTAL).pack(side="top", fill="x", padx=10)
 
         buttonGenerate = Button(text="Generate", command=self._generate)
@@ -79,7 +77,6 @@ class MainFrame(Frame):
     def _file_dialog(self, type, ent, item):
         # triggered when the user clicks a 'Browse' button
         if type == 'open':
-            print(type, ent, item)
             fn = None
             opts = {'initialfile': ent.get(), 'filetypes': [], 'title': 'Select a file to open...'}
 
@@ -105,12 +102,11 @@ class MainFrame(Frame):
     def _generate(self):
         self.tempfolder = tempfile.mkdtemp()
         self._temps.append(self.tempfolder)
-        currentDirectory = os.getcwd()
+        currentDirectory = os.getcwd() # but why?
 
         for entry in self.paths:
             try:
 
-                print(entry[1].get())
                 (
                     ffmpeg
                         .input(entry[1].get())
@@ -131,7 +127,6 @@ class MainFrame(Frame):
 
     def _create_archive(self):
         shutil.make_archive(self._file_dialog('save', 0, 0), 'zip', self.tempfolder)
-        shutil.rmtree(self.tempfolder)
         self.bar['value'] += 100 / (len(self.paths) + 1)
 
     def _clear(self):
