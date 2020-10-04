@@ -19,12 +19,14 @@ class MainFrame(Frame):
         self.master.title('LR2 Soundpack Generator')
         self.isapp = isapp
         ##
-        self.paths = []
-        self.entries = []
+        self.paths = [] # this keeps track of what entries to include in the pack BUT it does not get updated if user only changes text field!!
+        self.entries = [] # is filled with (item, entry) after _create_widgets is run; self.paths is a subset of self.entries
         self.master.minsize(750, 410)
-        self.switcherdir = ""
+        self.switcherdir = "" # this should be stored somehow? config file?
         ##
         self._create_widgets()
+
+        self._temps = [] # holder for temporary folders
 
     def _create_widgets(self):
         MenuBar = Menu(self)
@@ -55,7 +57,7 @@ class MainFrame(Frame):
             # ent is displaying file location
             ent = Entry(frame, width=45)
             btn = Button(frame, text='Browse...',
-                             command=lambda i="open", e=ent, item_holder=item: self._file_dialog(i, e, item_holder))
+                             command=lambda: self._file_dialog("open", ent, item))
             lbl.pack(side=LEFT, fill=X)
             ent.pack(side=LEFT, expand=Y, fill=X)
             btn.pack(side=LEFT, padx=5)
@@ -98,32 +100,31 @@ class MainFrame(Frame):
             return filedialog.askopenfilename(**opts)
 
     def _generate(self):
-        try:
-            self.tempfolder = tempfile.mkdtemp()
-            currentDirectory = os.getcwd()
+        self.tempfolder = tempfile.mkdtemp()
+        self._temps.append(self.tempfolder)
+        currentDirectory = os.getcwd()
 
-            for entry in self.paths:
-                try:
+        for entry in self.paths:
+            try:
 
-                    print(entry[1].get())
-                    (
-                        ffmpeg
-                            .input(entry[1].get())
-                            .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
-                            .run(capture_stdout=True, capture_stderr=True)
-                    )
+                print(entry[1].get())
+                (
+                    ffmpeg
+                        .input(entry[1].get())
+                        .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
+                        .run(capture_stdout=True, capture_stderr=True)
+                )
 
-                    os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
-                    self.bar['value'] += 100 / (len(self.paths) + 1)
-                except ffmpeg.Error as e:
-                    print('stdout:', e.stdout.decode('utf8'))
-                    print('stderr:', e.stderr.decode('utf8'))
-                    raise e
+                os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
+                self.bar['value'] += 100 / (len(self.paths) + 1)
+            except ffmpeg.Error as e:
+                print('stdout:', e.stdout.decode('utf8'))
+                print('stderr:', e.stderr.decode('utf8'))
+                raise e
 
-            self._create_archive()
-        finally:
-            pass
-            # shutil.rmtree(self.tempfolder) # temporarily!
+        self._create_archive()
+        shutil.rmtree(self.tempfolder)
+        self._temps.pop()
 
     def _create_archive(self):
         shutil.make_archive(self._file_dialog('save', 0, 0), 'zip', self.tempfolder)
@@ -133,6 +134,10 @@ class MainFrame(Frame):
     def _clear(self):
         for entry in self.entries:
             entry[1].delete(0, END)
+
+        # clean up extracted zip
+        for tempfolder in frame._temps:
+            shutil.rmtree(tempfolder)
 
     def _open_existing(self, shouldreturn):
         zippath = self._file_dialog('open_', 0,0)
@@ -144,19 +149,15 @@ class MainFrame(Frame):
                 self._clear()
 
                 importedtemp = tempfile.mkdtemp()
+                self._temps.append(importedtemp)
 
-                try:
-                    zippack.extractall(path=importedtemp)
+                zippack.extractall(path=importedtemp)
 
-                    for entry in self.entries:
-                        if os.path.exists(os.path.join(importedtemp, entry[0][1])):
-                            entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
+                for entry in self.entries:
+                    if os.path.exists(os.path.join(importedtemp, entry[0][1])):
+                        entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
 
-                            self.paths.append(entry) #I think this was missing; self.paths is a subset of self.entries
-                finally:
-                    pass
-                    # shutil.rmtree(importedtemp)
-                    # what??
+                        self.paths.append(entry) # append to self.paths (iterated by _generate() )
 
     def _switcher(self, param):
         if (param != "configure" and self.switcherdir == ""):
@@ -182,4 +183,6 @@ if __name__ == '__main__':
         frame = MainFrame()
         frame.mainloop()
     except Exception as e:
+        for tempfolder in frame._temps:
+            shutil.rmtree(tempfolder)
         messagebox.showerror("Error", e)
