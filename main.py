@@ -52,7 +52,7 @@ class MainFrame(Frame):
                      ['Xalax', "xalax.2"], ['Xalax BOSS', "xalax.4"]):
             frame = Frame(Panel)
             lbl = Label(frame, width=30, anchor="w", text='Select audio for {} '.format(item[0]))
-            # ent is file location
+            # ent is displaying file location
             ent = Entry(frame, width=45)
             btn = Button(frame, text='Browse...',
                              command=lambda i="open", e=ent, item_holder=item: self._file_dialog(i, e, item_holder))
@@ -105,6 +105,7 @@ class MainFrame(Frame):
             for entry in self.paths:
                 try:
 
+                    print(entry[1].get())
                     (
                         ffmpeg
                             .input(entry[1].get())
@@ -121,7 +122,8 @@ class MainFrame(Frame):
 
             self._create_archive()
         finally:
-            shutil.rmtree(self.tempfolder)
+            pass
+            # shutil.rmtree(self.tempfolder) # temporarily!
 
     def _create_archive(self):
         shutil.make_archive(self._file_dialog('save', 0, 0), 'zip', self.tempfolder)
@@ -149,8 +151,12 @@ class MainFrame(Frame):
                     for entry in self.entries:
                         if os.path.exists(os.path.join(importedtemp, entry[0][1])):
                             entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
+
+                            self.paths.append(entry) #I think this was missing; self.paths is a subset of self.entries
                 finally:
-                    shutil.rmtree(importedtemp)
+                    pass
+                    # shutil.rmtree(importedtemp)
+                    # what??
 
     def _switcher(self, param):
         if (param != "configure" and self.switcherdir == ""):
