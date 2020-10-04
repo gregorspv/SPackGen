@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import tempfile
 from tkinter import *
 from tkinter import filedialog
@@ -7,7 +8,6 @@ from tkinter.simpledialog import askstring
 from tkinter.ttk import Separator, Progressbar
 from tkinter import messagebox
 
-import ffmpeg
 import zipfile
 
 
@@ -105,21 +105,15 @@ class MainFrame(Frame):
         currentDirectory = os.getcwd() # but why?
 
         for entry in self.paths:
-            try:
 
-                (
-                    ffmpeg
-                        .input(entry[1].get())
-                        .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
-                        .run(capture_stdout=True, capture_stderr=True)
-                )
+            infile = entry[1].get()
+            outfile = os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav"))
 
-                os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
-                self.bar['value'] += 100 / (len(self.paths) + 1)
-            except ffmpeg.Error as e:
-                print('stdout:', e.stdout.decode('utf8'))
-                print('stderr:', e.stderr.decode('utf8'))
-                raise e
+            subprocess.call(["ffmpeg", "-i", infile, "-map_metadata", "-1", "-acodec", "adpcm_ms", outfile])
+
+            os.rename(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), os.path.join(currentDirectory, self.tempfolder, "{0}".format(entry[0][1])))
+            self.bar['value'] += 100 / (len(self.paths) + 1)
+
 
         self._create_archive()
         shutil.rmtree(self.tempfolder)
