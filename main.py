@@ -109,7 +109,7 @@ class MainFrame(Frame):
                     (
                         ffmpeg
                             .input(entry[1].get())
-                            .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), ac=1, acodec="adpcm_ms", fflags="+bitexact")
+                            .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
                             .run(capture_stdout=True, capture_stderr=True)
                     )
 
