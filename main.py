@@ -31,7 +31,7 @@ class MainFrame(Frame):
 
         FileMenu = Menu(MenuBar, tearoff=0)
         FileMenu.add_command(label="New", command=self._clear)
-        FileMenu.add_command(label="Open", command=self._open_existing)
+        FileMenu.add_command(label="Open", command=lambda: self._open_existing(False)) # I have no idea what the shouldreturn argument was for, might be leftover from some previous paradigm
         MenuBar.add_cascade(label="File", menu=FileMenu)
 
         SwitcherMenu = Menu(MenuBar, tearoff=0)
@@ -52,6 +52,7 @@ class MainFrame(Frame):
                      ['Xalax', "xalax.2"], ['Xalax BOSS', "xalax.4"]):
             frame = Frame(Panel)
             lbl = Label(frame, width=30, anchor="w", text='Select audio for {} '.format(item[0]))
+            # ent is file location
             ent = Entry(frame, width=45)
             btn = Button(frame, text='Browse...',
                              command=lambda i="open", e=ent, item_holder=item: self._file_dialog(i, e, item_holder))
@@ -107,7 +108,7 @@ class MainFrame(Frame):
                     (
                         ffmpeg
                             .input(entry[1].get())
-                            .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), acodec="adpcm_ms", fflags="+bitexact")
+                            .output(os.path.join(currentDirectory, self.tempfolder, "{0}{1}".format(entry[0][1][:-2], ".wav")), ac=1, acodec="adpcm_ms", fflags="+bitexact")
                             .run(capture_stdout=True, capture_stderr=True)
                     )
 
