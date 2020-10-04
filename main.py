@@ -13,8 +13,8 @@ import zipfile
 
 class MainFrame(Frame):
 
-    def __init__(self, isapp=True, name='spackgen'):
-        Frame.__init__(self, name=name)
+    def __init__(self, window, isapp=True, name='spackgen'):
+        Frame.__init__(self, window, name=name)
         self.pack(expand=Y, fill=BOTH)
         self.master.title('LR2 Soundpack Generator')
         self.isapp = isapp
@@ -57,7 +57,7 @@ class MainFrame(Frame):
             # ent is displaying file location
             ent = Entry(frame, width=45)
             btn = Button(frame, text='Browse...',
-                             command=lambda: self._file_dialog("open", ent, item))
+                             command=lambda e=ent, i=item : self._file_dialog("open", e, i)) # why doesn't ("open", ent, item) work???
             lbl.pack(side=LEFT, fill=X)
             ent.pack(side=LEFT, expand=Y, fill=X)
             btn.pack(side=LEFT, padx=5)
@@ -65,6 +65,8 @@ class MainFrame(Frame):
 
             ##
             self.entries.append((item, ent))
+
+            print(item, ent, btn)
 
         Separator(self.master, orient=HORIZONTAL).pack(side="top", fill="x", padx=10)
 
@@ -77,6 +79,7 @@ class MainFrame(Frame):
     def _file_dialog(self, type, ent, item):
         # triggered when the user clicks a 'Browse' button
         if type == 'open':
+            print(type, ent, item)
             fn = None
             opts = {'initialfile': ent.get(), 'filetypes': [], 'title': 'Select a file to open...'}
 
@@ -148,14 +151,14 @@ class MainFrame(Frame):
             with zipfile.ZipFile(zippath) as zippack:
                 self._clear()
 
-                importedtemp = tempfile.mkdtemp()
-                self._temps.append(importedtemp)
+                self.importedtemp = tempfile.mkdtemp()
+                self._temps.append(self.importedtemp)
 
-                zippack.extractall(path=importedtemp)
+                zippack.extractall(path=self.importedtemp)
 
                 for entry in self.entries:
-                    if os.path.exists(os.path.join(importedtemp, entry[0][1])):
-                        entry[1].insert(END, os.path.join(importedtemp, entry[0][1]))
+                    if os.path.exists(os.path.join(self.importedtemp, entry[0][1])):
+                        entry[1].insert(END, os.path.join(self.importedtemp, entry[0][1]))
 
                         self.paths.append(entry) # append to self.paths (iterated by _generate() )
 
@@ -178,11 +181,21 @@ class MainFrame(Frame):
             os.system("{0} backup folder".format(self.switcherdir))
 
 
+def on_closing():
+    # clean up temps on user close
+    for tempfolder in frame._temps:
+        shutil.rmtree(tempfolder)
+    root.destroy()
+
+
 if __name__ == '__main__':
     try:
-        frame = MainFrame()
-        frame.mainloop()
+        root = Tk()
+        frame = MainFrame(root)
+        root.protocol("WM_DELETE_WINDOW", on_closing)
+        root.mainloop()
     except Exception as e:
-        for tempfolder in frame._temps:
-            shutil.rmtree(tempfolder)
+        if frame:
+            for tempfolder in frame._temps:
+                shutil.rmtree(tempfolder)
         messagebox.showerror("Error", e)
